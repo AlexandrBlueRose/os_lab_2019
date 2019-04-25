@@ -1,9 +1,9 @@
 #!/bin/bash
-
-for i in {1..10}
-do
-    echo "$i sec"
-    sleep 1
-done
-
-echo "Done!"
+echo "Enter first number"
+read x
+echo "Enter second number"
+read y
+if(y=0) then echo "error zero"
+elif then(( sum=x/y ))
+fi
+echo "The result of addition=$sum"

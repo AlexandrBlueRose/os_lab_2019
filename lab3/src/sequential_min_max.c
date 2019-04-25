@@ -1,14 +1,21 @@
-#include <stdio.h>
-#include <stdlib.h>
-
+#include<stdio.h>
+#include<stdlib.h>
 #include "find_min_max.h"
 #include "utils.h"
 
 int main(int argc, char **argv) {
+  
   if (argc != 3) {
     printf("Usage: %s seed arraysize\n", argv[0]);
     return 1;
   }
+  
+  //Функция atoi() конвертирует 
+  //строку, на которую указывает 
+  //параметр str, в величину типа int. 
+  //Строка должна содержать корректную 
+  //запись целого числа. В противном 
+  //случае возвращается 0.
 
   int seed = atoi(argv[1]);
   if (seed <= 0) {

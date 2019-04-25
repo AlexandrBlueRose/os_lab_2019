@@ -6,6 +6,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include<signal.h>
+
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -15,10 +17,15 @@
 #include "find_min_max.h"
 #include "utils.h"
 
+int kill_func(){
+     exit(2);
+}
+
 int main(int argc, char **argv) {
   int seed = -1;
   int array_size = -1;
   int pnum = -1;
+  int timeout=-1;
   bool with_files = false;
 
   while (true) {
@@ -28,8 +35,9 @@ int main(int argc, char **argv) {
                                       {"array_size", required_argument, 0, 0},
                                       {"pnum", required_argument, 0, 0},
                                       {"by_files", no_argument, 0, 'f'},
+                                      {"timeout", required_argument, 0, 't'},
                                       {0, 0, 0, 0}};
-
+//optional_argument
     int option_index = 0;
     int c = getopt_long(argc, argv, "f", options, &option_index);
 
@@ -68,6 +76,13 @@ int main(int argc, char **argv) {
           case 3:
             with_files = true;
             break;
+          case 4:
+            timeout = atoi(optarg);
+            if(timeout<=0){
+            printf("timeout must be a positive num\n");
+            return 1;
+            }
+            break;
 
           defalut:
             printf("Index %d is out of options\n", option_index);
@@ -75,6 +90,13 @@ int main(int argc, char **argv) {
         break;
       case 'f':
         with_files = true;
+        break;
+      case 't':
+        timeout = atoi(optarg);
+        if(timeout<=0){
+            printf("timeout must be a positive num\n");
+            return 1;
+        }
         break;
 
       case '?':
@@ -113,6 +135,7 @@ int main(int argc, char **argv) {
     
     pid_t currentPID;
     
+    pid_t* pids = malloc(sizeof(pid_t) * pnum);
     
   for (int i = 0; i < pnum; i++) {
     pid_t child_pid = fork();
@@ -121,6 +144,7 @@ int main(int argc, char **argv) {
       // successful fork
       active_child_processes++;
       if (child_pid == 0) {
+         signal(SIGKILL, kill_func);
          struct MinMax mm;
          if(i*part < array_size)
              mm = GetMinMax(array + i*part, 
@@ -141,6 +165,9 @@ int main(int argc, char **argv) {
         }
         return 0;
       }
+      else{
+          pids[i] = child_pid;
+      }
 
     } else {
       printf("Fork failed!\n");
@@ -148,15 +175,17 @@ int main(int argc, char **argv) {
     }
   }
 
-  while (active_child_processes > 0) {
-    // your code here
-    //close(pipefd[1]);
-    
-    wait(NULL);
-    //printf(kill(currentPID, SIGKILL) == 0 ? "killed child process\n" : "error while killing\n");
-    
-    active_child_processes--;
-  }
+
+if(timeout>0){
+    sleep(timeout);
+    for(int k = 0; k<pnum; k++)
+        kill(pids[k], SIGKILL);
+    printf("timeout!\n");
+}
+    while (active_child_processes > 0) {
+        wait(NULL);
+        active_child_processes--;
+    }
 
   struct MinMax min_max;
   min_max.min = INT_MAX;
@@ -191,6 +220,7 @@ int main(int argc, char **argv) {
   elapsed_time += (finish_time.tv_usec - start_time.tv_usec) / 1000.0;
 
   free(array);
+  free(pids);
 
   printf("\nMin: %d\n", min_max.min);
   printf("Max: %d\n", min_max.max);
