@@ -5,28 +5,36 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#include<signal.h>
-
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
 #include <getopt.h>
-
 #include "find_min_max.h"
 #include "utils.h"
-
-int kill_func(){
-     exit(2);
+int pnum;
+int* pids;
+void handle(int signum)
+{
+    printf("Processes : ");
+    for (int i = 0; i < pnum; i++)
+     {
+         if(pids[i] != 0)
+            printf("%d ", pids[i]);
+     }    
+    printf("have been killed\n");
+    if(kill(0,SIGKILL)  == 0)
+        printf("Process killed\n");
+    else
+        printf("Error when killing process\n");      
 }
 
 int main(int argc, char **argv) {
   int seed = -1;
   int array_size = -1;
-  int pnum = -1;
-  int timeout=-1;
+  pnum = -1;
   bool with_files = false;
+  int timeout = -1;
 
   while (true) {
     int current_optind = optind ? optind : 1;
@@ -35,9 +43,9 @@ int main(int argc, char **argv) {
                                       {"array_size", required_argument, 0, 0},
                                       {"pnum", required_argument, 0, 0},
                                       {"by_files", no_argument, 0, 'f'},
-                                      {"timeout", required_argument, 0, 't'},
+                                      {"timeout", required_argument, 0, 0},
                                       {0, 0, 0, 0}};
-//optional_argument
+
     int option_index = 0;
     int c = getopt_long(argc, argv, "f", options, &option_index);
 
@@ -48,28 +56,25 @@ int main(int argc, char **argv) {
         switch (option_index) {
           case 0:
             seed = atoi(optarg);
-            // your code here
-            // error handling
-            if(seed<=0){
-                printf("seed must be a positive num\n ");
+            if (seed <= 0)
+            {
+                printf("Seed must be a positive number");
                 return 1;
             }
             break;
           case 1:
             array_size = atoi(optarg);
-            // your code here
-            // error handling
-            if(array_size<=0){
-                printf("array_size must be a positive num\n");
+            if(array_size <= 0)
+            {
+                printf("Array size must be a positive number");
                 return 1;
             }
             break;
           case 2:
             pnum = atoi(optarg);
-            // your code here
-            // error handling
-            if(pnum<=0){
-                printf("pnum must be a positive num\n");
+            if(pnum <= 0)
+            {
+                printf("Number of procceses must be a positive");
                 return 1;
             }
             break;
@@ -78,25 +83,18 @@ int main(int argc, char **argv) {
             break;
           case 4:
             timeout = atoi(optarg);
-            if(timeout<=0){
-            printf("timeout must be a positive num\n");
-            return 1;
+            if(timeout <= 0)
+            {
+                printf("Timeout must be a positive number");
+                return 1;
             }
             break;
-
-          defalut:
+          default:
             printf("Index %d is out of options\n", option_index);
         }
         break;
       case 'f':
         with_files = true;
-        break;
-      case 't':
-        timeout = atoi(optarg);
-        if(timeout<=0){
-            printf("timeout must be a positive num\n");
-            return 1;
-        }
         break;
 
       case '?':
@@ -121,96 +119,129 @@ int main(int argc, char **argv) {
   int *array = malloc(sizeof(int) * array_size);
   GenerateArray(array, array_size, seed);
   int active_child_processes = 0;
-  //for(int i = 0; i < array_size; i++)
-    //array[i]%=21, printf("%i ", array[i]);//??
-    //printf("\n");
-    
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
-
-    int part = array_size/pnum;
-    int pipefd[2];
-    
-    pipe(pipefd);
-    
-    pid_t currentPID;
-    
-    pid_t* pids = malloc(sizeof(pid_t) * pnum);
-    
+  int pipe1[2];
+  pipe(pipe1);
+  pids = malloc(sizeof(pid_t) * pnum); 
   for (int i = 0; i < pnum; i++) {
     pid_t child_pid = fork();
-    currentPID = child_pid;
     if (child_pid >= 0) {
-      // successful fork
-      active_child_processes++;
-      if (child_pid == 0) {
-         signal(SIGKILL, kill_func);
-         struct MinMax mm;
-         if(i*part < array_size)
-             mm = GetMinMax(array + i*part, 
-                            0,
-                            part);
-         else
-            mm = GetMinMax(array + array_size - part, 0, part);
-
-            //printf(COLOR _BOLD _RED "\n\tPARENT: %d, this->PID: %d, CHILD: %d || min: %i, max: %i\n" COLOR _NC, getppid(), getpid(), currentPID, mm.min, mm.max);
-        if (with_files) {
-          FILE* fp = fopen("processOut.txt", "a");
-          fwrite(&mm, sizeof(struct MinMax), 1, fp);
-          fclose(fp);
-        } else {
-          // use pipe here
-          write(pipefd[1],&mm,sizeof(struct MinMax));
-          
+      active_child_processes += 1;
+      if (child_pid == 0) 
+      {
+            struct MinMax min_max;
+            if (i != pnum - 1)
+            {
+                min_max = GetMinMax(array,i*array_size/pnum,(i+1)*array_size/pnum);
+            }
+            else
+            {
+                min_max = GetMinMax(array,(array_size - array_size/pnum),array_size);
+            }
+            if (with_files) 
+            {
+              FILE* fp = fopen("results.txt", "a");
+              fwrite(&min_max, sizeof(struct MinMax), 1, fp);
+              fclose(fp);
+            } else 
+            {
+                close(pipe1[0]);
+                write(pipe1[1], &min_max, sizeof(struct MinMax));
+            }
+            return 0;
         }
-        return 0;
-      }
-      else{
-          pids[i] = child_pid;
-      }
-
+        else
+        {
+            pids[i] = child_pid;
+        }
     } else {
       printf("Fork failed!\n");
       return 1;
     }
   }
+  if(timeout != -1)
+  {
+    
+      int alarm1 = ualarm(timeout*1000,0);
+      int waiter;
+      while (active_child_processes > 0) {
+          waiter = waitpid(0,NULL,WNOHANG);//ожидает 
+          //завершения процесса
+          //WNOHANG означает немедленное возвращение 
+          //управления,
+        // если ни один дочерний процесс не завершил 
+        //выполнение.
+        //WUNTRACED
+//означает возврат управления и для остановленных (но не отслеживаемых) 
+//дочерних процессов, о статусе которых еще не было сообщено. Статус для отслеживаемых остановленных подпроцессов также обеспечивается без этой опции.
+          signal(SIGALRM, handle);//сигнал, посылаемый процессу 
+          //по истечении времени, 
+          //предварительно заданного функцией alarm()
+          if(waiter != 0)
+          /*
+           * < -1
+означает, что нужно ждать любого дочернего процесса, 
+идентификатор группы процессов которого равен абсолютному
+ значению pid.
+-1
+означает ожидание любого дочернего процесса; 
+функция wait ведет себя точно так же.
+0
+означает ожидание любого дочернего процесса, 
+идентификатор группы процессов которого равен 
+идентификатору текущего процесса.
+> 0
+означает ожидание дочернего процесса, чей идентификатор
+ равен pid.
+           */
+          {
+              for (int i = 0; i < pnum; i++)
+              {
+                  if(pids[i] == waiter)
+                    pids[i] = 0;
+              }
+              //printf("Process %d successfully executed\n", waiter);
+              active_child_processes -= 1; 
+          }
+      }
 
-
-if(timeout>0){
-    sleep(timeout);
-    for(int k = 0; k<pnum; k++)
-        kill(pids[k], SIGKILL);
-    printf("timeout!\n");
+  }
+else
+{
+  while (active_child_processes > 0) {
+    close(pipe1[1]);
+    wait(NULL);
+    // ожидание, 
+    //когда какой-либо ребенок завершит свою работу.
+    active_child_processes -= 1;
+  }
 }
-    while (active_child_processes > 0) {
-        wait(NULL);
-        active_child_processes--;
-    }
 
   struct MinMax min_max;
   min_max.min = INT_MAX;
   min_max.max = INT_MIN;
 
-
   for (int i = 0; i < pnum; i++) {
-    struct MinMax mm;
-    
+    int min = INT_MAX;
+    int max = INT_MIN;
+    struct MinMax temp;
     if (with_files) {
-      // read from files
-        FILE* fp = fopen("processOut.txt", "rb");
-        //printf(COLOR _BOLD _BLUE "\nBYTE FILE POS: %i, FILE POINTER: %p" COLOR _NC, i*sizeof(struct MinMax),*fp);
-        fseek(fp, i*sizeof(struct MinMax), SEEK_SET);
-        fread(&mm, sizeof(struct MinMax), 1, fp);
-        //printf(COLOR _BOLD _GREEN "\n[FROM FILE: min:%i  max:%i]" COLOR _NC,mm.min, mm.max);
-        fclose(fp);
+      FILE* fp = fopen("results.txt", "r");
+      fseek(fp,i*sizeof(struct MinMax),SEEK_SET);
+      //Функция fseek() устанавливает указатель положения в файле,
+      //связанном со stream, 
+      //в соответствии со значениями offset и origin
+
+      fread(&temp,sizeof(struct MinMax), 1, fp);
+      fclose(fp);
     } else {
-      // read from pipes
-      read(pipefd[0], &mm, sizeof(struct MinMax));
-      //printf(COLOR _BOLD _GREEN "\n[FROM PIPE: min:%i  max:%i]" COLOR _NC,mm.min, mm.max);
+        struct MinMax temp;
+        read(pipe1[0], &temp, sizeof(struct MinMax));
     }
 
-    if (mm.min < min_max.min) min_max.min = mm.min;
-    if (mm.max > min_max.max) min_max.max = mm.max;
+    if (temp.min < min_max.min) min_max.min = temp.min;
+    if (temp.max > min_max.max) min_max.max = temp.max;
   }
 
   struct timeval finish_time;
@@ -220,13 +251,10 @@ if(timeout>0){
   elapsed_time += (finish_time.tv_usec - start_time.tv_usec) / 1000.0;
 
   free(array);
-  free(pids);
-
-  printf("\nMin: %d\n", min_max.min);
+  printf("Min: %d\n", min_max.min);
   printf("Max: %d\n", min_max.max);
   printf("Elapsed time: %fms\n", elapsed_time);
   fflush(NULL);
-  
-    remove("processOut.txt");
+  remove("results.txt");
   return 0;
 }
