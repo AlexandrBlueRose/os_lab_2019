@@ -15,6 +15,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+//5 функций где будет происходжить выполение какого то алгоритма, а так же
+// блокироваться и разблокироватьтся мьютексы
 void do_one_thing(int *);
 void do_one_thing2(int *);
 void do_another_thing(int *);
@@ -22,13 +24,18 @@ void do_another_thing2(int *);
 void do_wrap_up(int);
 int common = 0; /* A shared variable for two threads */
 int r1 = 0, r2 = 0, r3 = 0;
+//4 мьютекса  которые мы будеим паралельно блокировать и разблокировать 
 pthread_mutex_t mut1 = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mut2 = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mut3 = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mut4 = PTHREAD_MUTEX_INITIALIZER;
 int main() {
   pthread_t thread1, thread2,thread3,thread4;
-
+  
+  
+  
+  //в 4 if-ах мы запускаем 4 функции в 4 потоках которые параллельно 
+  //выполняюьтся
   if (pthread_create(&thread1, NULL, (void *)do_one_thing,
 			  (void *)&common) != 0) {
     perror("pthread_create");
@@ -78,6 +85,14 @@ if (pthread_join(thread4, NULL) != 0) {
   return 0;
 }
 
+//в функции мы блочим 1 мьютекс ,но в потоках других 3 у нас еще 
+//есть 3 функции ниже которые блочат соответственно другие мьютексы 
+//соответственно так как они параллельно выполняются ,может создастся 
+//ситуация где в одном потоке у нас один мьютекс заблокировался 
+//а в другом чтобы продолжить выполение нужно чтобы он был открыт и
+//создается ситуация когда программа не может продолжать выполенение
+//основная инфа по мьютексав в http://qaru.site/questions/16241/what-is-a-mutex
+//и https://ru.wikipedia.org/wiki/%D0%9C%D1%8C%D1%8E%D1%82%D0%B5%D0%BA%D1%81
 void do_one_thing(int *pnum_times) {
   int i, j, x;
   unsigned long k;
