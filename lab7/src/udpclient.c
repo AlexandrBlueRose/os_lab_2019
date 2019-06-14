@@ -27,8 +27,7 @@ int main(int argc, char **argv) {
 
   memset(&servaddr, 0, sizeof(servaddr));
   servaddr.sin_family = AF_INET;
-  servaddr.sin_port = htons(SERV_PORT);
-
+  servaddr.sin_port = (SERV_PORT);
   if (inet_pton(AF_INET, argv[1], &servaddr.sin_addr) < 0) {
     perror("inet_pton problem");
     exit(1);
